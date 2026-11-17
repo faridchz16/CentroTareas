@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.chavez.centrotareas.model.CargaUi
 import com.chavez.centrotareas.model.PrimosUi
 import com.chavez.centrotareas.ui.theme.ExitoContenedor
 import com.chavez.centrotareas.ui.theme.ExitoContenedorOscuro
@@ -56,6 +57,7 @@ fun PantallaTareas(vm: TareasViewModel) {
     val progreso by vm.progreso.collectAsState()
     val corriendo by vm.corriendo.collectAsState()
     val primos by vm.primos.collectAsState()
+    val carga by vm.carga.collectAsState()
 
     var toques by rememberSaveable { mutableIntStateOf(0) }
     var textoPrimos by rememberSaveable { mutableStateOf("5000000") }
@@ -64,6 +66,7 @@ fun PantallaTareas(vm: TareasViewModel) {
     val hasta = textoPrimos.toIntOrNull()
     val numeroValido = hasta != null && hasta >= 2
     val calculando = primos is PrimosUi.Calculando
+    val cargando = carga is CargaUi.Cargando
 
     Scaffold(
         topBar = {
@@ -156,19 +159,7 @@ fun PantallaTareas(vm: TareasViewModel) {
 
                 when (val estadoPrimos = primos) {
                     PrimosUi.Inicial -> Unit
-                    PrimosUi.Calculando -> Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Text(
-                            text = "Calculando...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    PrimosUi.Calculando -> Cargando(texto = "Calculando...")
                     is PrimosUi.Listo -> RecuadroExito(
                         lineas = listOf(
                             "Primos hasta $hastaCalculado: ${estadoPrimos.cantidad}",
@@ -183,10 +174,41 @@ fun PantallaTareas(vm: TareasViewModel) {
             }
 
             TarjetaTarea(titulo = "Dos cargas") {
-                Text(
-                    text = "Pendiente (Paso 6)",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { vm.cargarUnaPorUna() },
+                        enabled = !cargando
+                    ) {
+                        Text("Una por una")
+                    }
+                    Button(
+                        onClick = { vm.cargarALaVez() },
+                        enabled = !cargando
+                    ) {
+                        Text("A la vez")
+                    }
+                }
+
+                when (val estadoCarga = carga) {
+                    CargaUi.Inicial -> Text(
+                        text = "«Una por una» tarda ≈ 5000 ms",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    CargaUi.Cargando -> Cargando(texto = "Cargando...")
+                    is CargaUi.Exito -> RecuadroExito(
+                        lineas = listOf(
+                            "Modo: ${estadoCarga.modo}",
+                            "Perfil: ${estadoCarga.perfil}",
+                            "Pedidos: ${estadoCarga.pedidos}",
+                            "Tiempo: ${estadoCarga.milisegundos} ms"
+                        )
+                    )
+                    is CargaUi.Error -> Text(
+                        text = estadoCarga.mensaje,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }
@@ -218,6 +240,23 @@ private fun TarjetaTarea(
             )
             contenido()
         }
+    }
+}
+
+@Composable
+private fun Cargando(texto: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp
+        )
+        Text(
+            text = texto,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
