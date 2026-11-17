@@ -92,44 +92,48 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
     private val _carga = MutableStateFlow<CargaUi>(CargaUi.Inicial)
     val carga: StateFlow<CargaUi> = _carga.asStateFlow()
 
-    fun cargarUnaPorUna() {
-        if (_carga.value is CargaUi.Cargando) return
+    private val _simularError = MutableStateFlow(false)
+    val simularError: StateFlow<Boolean> = _simularError.asStateFlow()
 
-        viewModelScope.launch {
-            _carga.value = CargaUi.Cargando
-            val inicio = System.currentTimeMillis()
+    fun cambiarSimularError(valor: Boolean) {
+        _simularError.value = valor
+    }
 
-            val perfil = repo.cargarPerfil()
-            val pedidos = repo.cargarPedidos(false)
+    fun cargarUnaPorUna() = cargar("Una por una") {
+        val perfil = repo.cargarPerfil()
+        val pedidos = repo.cargarPedidos(_simularError.value)
+        perfil to pedidos
+    }
 
-            _carga.value = CargaUi.Exito(
-                modo = "Una por una",
-                perfil = perfil,
-                pedidos = pedidos.size,
-                milisegundos = System.currentTimeMillis() - inicio
-            )
+    fun cargarALaVez() = cargar("A la vez") {
+        coroutineScope {
+            val perfilDiferido = async { repo.cargarPerfil() }
+            val pedidosDiferidos = async { repo.cargarPedidos(_simularError.value) }
+            perfilDiferido.await() to pedidosDiferidos.await()
         }
     }
 
-    fun cargarALaVez() {
+    fun reintentar() = cargarALaVez()
+
+    private fun cargar(modo: String, obtener: suspend () -> Pair<String, List<String>>) {
         if (_carga.value is CargaUi.Cargando) return
 
         viewModelScope.launch {
             _carga.value = CargaUi.Cargando
             val inicio = System.currentTimeMillis()
-
-            val (perfil, pedidos) = coroutineScope {
-                val perfilDiferido = async { repo.cargarPerfil() }
-                val pedidosDiferidos = async { repo.cargarPedidos(false) }
-                Pair(perfilDiferido.await(), pedidosDiferidos.await())
+            try {
+                val (perfil, pedidos) = obtener()
+                _carga.value = CargaUi.Exito(
+                    modo = modo,
+                    perfil = perfil,
+                    pedidos = pedidos.size,
+                    milisegundos = System.currentTimeMillis() - inicio
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _carga.value = CargaUi.Error("No se pudo cargar: ${e.message}")
             }
-
-            _carga.value = CargaUi.Exito(
-                modo = "A la vez",
-                perfil = perfil,
-                pedidos = pedidos.size,
-                milisegundos = System.currentTimeMillis() - inicio
-            )
         }
     }
 }
