@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,6 +35,7 @@ import com.chavez.centrotareas.viewmodel.TareasViewModel
 @Composable
 fun PantallaTareas(vm: TareasViewModel) {
     val mensaje by vm.mensaje.collectAsState()
+    val progreso by vm.progreso.collectAsState()
 
     var toques by rememberSaveable { mutableIntStateOf(0) }
 
@@ -60,9 +62,21 @@ fun PantallaTareas(vm: TareasViewModel) {
                 Button(onClick = { toques++ }) {
                     Text("Tócame: $toques")
                 }
+
                 Button(onClick = { vm.tareaLarga() }) {
-                    Text("Tarea larga")
+                    Text("Iniciar")
                 }
+
+                LinearProgressIndicator(
+                    progress = { progreso },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = "${(progreso * 100).toInt()} %",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 Text(
                     text = mensaje,
