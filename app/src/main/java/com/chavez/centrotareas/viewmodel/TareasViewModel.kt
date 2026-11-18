@@ -7,16 +7,13 @@ import com.chavez.centrotareas.data.TareasRepository
 import com.chavez.centrotareas.model.CargaUi
 import com.chavez.centrotareas.model.PrimosUi
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
 
@@ -41,12 +38,8 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
                 _mensaje.value = "Trabajando..."
                 Log.d("HILO", "Antes: ${Thread.currentThread().name}")
 
-                withContext(Dispatchers.Default) {
-                    Log.d("HILO", "Dentro: ${Thread.currentThread().name}")
-                    for (i in 1..100) {
-                        delay(40)
-                        _progreso.value = i / 100f
-                    }
+                repo.progresoTarea().collect { valor ->
+                    _progreso.value = valor
                 }
 
                 Log.d("HILO", "Despues: ${Thread.currentThread().name}")
