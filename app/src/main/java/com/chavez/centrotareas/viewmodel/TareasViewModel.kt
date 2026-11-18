@@ -8,12 +8,14 @@ import com.chavez.centrotareas.model.CargaUi
 import com.chavez.centrotareas.model.PrimosUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
 
@@ -92,16 +94,23 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
         _simularError.value = valor
     }
 
+    private val _redLenta = MutableStateFlow(false)
+    val redLenta: StateFlow<Boolean> = _redLenta.asStateFlow()
+
+    fun cambiarRedLenta(valor: Boolean) {
+        _redLenta.value = valor
+    }
+
     fun cargarUnaPorUna() = cargar("Una por una") {
         val perfil = repo.cargarPerfil()
-        val pedidos = repo.cargarPedidos(_simularError.value)
+        val pedidos = repo.cargarPedidos(_simularError.value, _redLenta.value)
         perfil to pedidos
     }
 
     fun cargarALaVez() = cargar("A la vez") {
         coroutineScope {
             val perfilDiferido = async { repo.cargarPerfil() }
-            val pedidosDiferidos = async { repo.cargarPedidos(_simularError.value) }
+            val pedidosDiferidos = async { repo.cargarPedidos(_simularError.value, _redLenta.value) }
             perfilDiferido.await() to pedidosDiferidos.await()
         }
     }
@@ -115,18 +124,24 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
             _carga.value = CargaUi.Cargando
             val inicio = System.currentTimeMillis()
             try {
-                val (perfil, pedidos) = obtener()
+                val (perfil, pedidos) = withTimeout(LIMITE_CARGA_MS) { obtener() }
                 _carga.value = CargaUi.Exito(
                     modo = modo,
                     perfil = perfil,
                     pedidos = pedidos.size,
                     milisegundos = System.currentTimeMillis() - inicio
                 )
+            } catch (e: TimeoutCancellationException) {
+                _carga.value = CargaUi.Error("Tardó demasiado (más de ${LIMITE_CARGA_MS / 1000} s)")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _carga.value = CargaUi.Error("No se pudo cargar: ${e.message}")
             }
         }
+    }
+
+    private companion object {
+        const val LIMITE_CARGA_MS = 6000L
     }
 }

@@ -60,6 +60,7 @@ fun PantallaTareas(vm: TareasViewModel) {
     val primos by vm.primos.collectAsState()
     val carga by vm.carga.collectAsState()
     val simularError by vm.simularError.collectAsState()
+    val redLenta by vm.redLenta.collectAsState()
 
     var toques by rememberSaveable { mutableIntStateOf(0) }
     var textoPrimos by rememberSaveable { mutableStateOf("5000000") }
@@ -188,6 +189,22 @@ fun PantallaTareas(vm: TareasViewModel) {
                     )
                     Text(
                         text = "Simular error",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.align(Alignment.Start),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Switch(
+                        checked = redLenta,
+                        onCheckedChange = { vm.cambiarRedLenta(it) },
+                        enabled = !cargando
+                    )
+                    Text(
+                        text = "Red lenta",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
