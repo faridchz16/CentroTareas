@@ -3,6 +3,7 @@ package com.chavez.centrotareas.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chavez.centrotareas.data.HistorialRepository
 import com.chavez.centrotareas.data.TareasRepository
 import com.chavez.centrotareas.model.CargaUi
 import com.chavez.centrotareas.model.ModoCarga
@@ -15,14 +16,19 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
 
-class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
+class TareasViewModel(
+    private val repo: TareasRepository,
+    private val historialRepo: HistorialRepository
+) : ViewModel() {
 
     private val _mensaje = MutableStateFlow("Listo")
     val mensaje: StateFlow<String> = _mensaje.asStateFlow()
@@ -78,7 +84,9 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
                 val cantidad = repo.contarPrimos(hasta) { progreso ->
                     _primos.value = PrimosUi.Calculando(progreso)
                 }
-                _primos.value = PrimosUi.Listo(cantidad, System.currentTimeMillis() - inicio)
+                val milisegundos = System.currentTimeMillis() - inicio
+                _primos.value = PrimosUi.Listo(cantidad, milisegundos)
+                registrarHistorial("Primos hasta $hasta: $cantidad ($milisegundos ms)")
             } catch (e: CancellationException) {
                 _primos.value = PrimosUi.Cancelado
                 throw e
@@ -110,6 +118,23 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
 
     private val _tiempos = MutableStateFlow(TiemposCarga())
     val tiempos: StateFlow<TiemposCarga> = _tiempos.asStateFlow()
+
+    val historial: StateFlow<List<String>> = historialRepo.historial
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    fun borrarHistorial() {
+        viewModelScope.launch {
+            try {
+                historialRepo.borrar()
+            } catch (e: IOException) {
+                Log.w(TAG_HISTORIAL, "No se pudo borrar el historial", e)
+            }
+        }
+    }
 
     fun cargarUnaPorUna() = cargar(ModoCarga.UNA_POR_UNA) {
         val perfil = repo.cargarPerfil()
@@ -150,6 +175,7 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
                     pedidos = pedidos.size,
                     milisegundos = milisegundos
                 )
+                registrarHistorial("${modo.etiqueta}: $milisegundos ms")
             } catch (e: TimeoutCancellationException) {
                 _carga.value = CargaUi.Error("Tardó demasiado (más de ${LIMITE_CARGA_MS / 1000} s)")
             } catch (e: CancellationException) {
@@ -174,8 +200,19 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
         return withTimeout(LIMITE_CARGA_MS) { bloque() }
     }
 
+    private fun registrarHistorial(entrada: String) {
+        viewModelScope.launch {
+            try {
+                historialRepo.agregar(entrada)
+            } catch (e: IOException) {
+                Log.w(TAG_HISTORIAL, "No se pudo guardar en el historial", e)
+            }
+        }
+    }
+
     private companion object {
         const val LIMITE_CARGA_MS = 6000L
         const val INTENTOS_MAXIMOS = 3
+        const val TAG_HISTORIAL = "HISTORIAL"
     }
 }

@@ -64,6 +64,7 @@ fun PantallaTareas(vm: TareasViewModel) {
     val simularError by vm.simularError.collectAsState()
     val redLenta by vm.redLenta.collectAsState()
     val tiempos by vm.tiempos.collectAsState()
+    val historial by vm.historial.collectAsState()
 
     var toques by rememberSaveable { mutableIntStateOf(0) }
     var textoPrimos by rememberSaveable { mutableStateOf("5000000") }
@@ -264,6 +265,36 @@ fun PantallaTareas(vm: TareasViewModel) {
 
                 if (tiempos.tieneDatos) {
                     TablaComparacion(tiempos = tiempos)
+                }
+            }
+
+            TarjetaTarea(titulo = "Historial") {
+                if (historial.isEmpty()) {
+                    Text(
+                        text = "Todavía no hay resultados",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        historial.forEachIndexed { indice, entrada ->
+                            Text(
+                                text = "${indice + 1}. $entrada",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { vm.borrarHistorial() },
+                    enabled = historial.isNotEmpty()
+                ) {
+                    Text("Borrar historial")
                 }
             }
         }
