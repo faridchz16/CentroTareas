@@ -44,7 +44,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.chavez.centrotareas.model.CargaUi
+import com.chavez.centrotareas.model.ModoCarga
 import com.chavez.centrotareas.model.PrimosUi
+import com.chavez.centrotareas.model.TiemposCarga
 import com.chavez.centrotareas.ui.theme.ExitoContenedor
 import com.chavez.centrotareas.ui.theme.ExitoContenedorOscuro
 import com.chavez.centrotareas.ui.theme.SobreExitoContenedor
@@ -61,6 +63,7 @@ fun PantallaTareas(vm: TareasViewModel) {
     val carga by vm.carga.collectAsState()
     val simularError by vm.simularError.collectAsState()
     val redLenta by vm.redLenta.collectAsState()
+    val tiempos by vm.tiempos.collectAsState()
 
     var toques by rememberSaveable { mutableIntStateOf(0) }
     var textoPrimos by rememberSaveable { mutableStateOf("5000000") }
@@ -223,19 +226,19 @@ fun PantallaTareas(vm: TareasViewModel) {
                         onClick = { vm.cargarUnaPorUna() },
                         enabled = !cargando
                     ) {
-                        Text("Una por una")
+                        Text(ModoCarga.UNA_POR_UNA.etiqueta)
                     }
                     Button(
                         onClick = { vm.cargarALaVez() },
                         enabled = !cargando
                     ) {
-                        Text("A la vez")
+                        Text(ModoCarga.A_LA_VEZ.etiqueta)
                     }
                 }
 
                 when (val estadoCarga = carga) {
                     CargaUi.Inicial -> Text(
-                        text = "«Una por una» tarda ≈ 5000 ms",
+                        text = "«${ModoCarga.UNA_POR_UNA.etiqueta}» tarda ≈ 5000 ms",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -245,7 +248,7 @@ fun PantallaTareas(vm: TareasViewModel) {
                     )
                     is CargaUi.Exito -> RecuadroExito(
                         lineas = listOf(
-                            "Modo: ${estadoCarga.modo}",
+                            "Modo: ${estadoCarga.modo.etiqueta}",
                             "Perfil: ${estadoCarga.perfil}",
                             "Pedidos: ${estadoCarga.pedidos}",
                             "Tiempo: ${estadoCarga.milisegundos} ms"
@@ -258,8 +261,67 @@ fun PantallaTareas(vm: TareasViewModel) {
                         }
                     }
                 }
+
+                if (tiempos.tieneDatos) {
+                    TablaComparacion(tiempos = tiempos)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun TablaComparacion(tiempos: TiemposCarga) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "Comparación de tiempos",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        FilaTiempo(modo = ModoCarga.UNA_POR_UNA, milisegundos = tiempos.unaPorUna)
+        FilaTiempo(modo = ModoCarga.A_LA_VEZ, milisegundos = tiempos.aLaVez)
+
+        val ahorroMs = tiempos.ahorroMs
+        val ahorroPorcentaje = tiempos.ahorroPorcentaje
+        if (ahorroMs != null && ahorroPorcentaje != null) {
+            Text(
+                text = "Ahorro con «${ModoCarga.A_LA_VEZ.etiqueta}»: $ahorroMs ms ($ahorroPorcentaje %)",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilaTiempo(modo: ModoCarga, milisegundos: Long?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = modo.etiqueta,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = milisegundos?.let { "$it ms" } ?: "—",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

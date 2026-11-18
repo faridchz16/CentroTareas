@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chavez.centrotareas.data.TareasRepository
 import com.chavez.centrotareas.model.CargaUi
+import com.chavez.centrotareas.model.ModoCarga
 import com.chavez.centrotareas.model.PrimosUi
+import com.chavez.centrotareas.model.TiemposCarga
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -15,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
@@ -105,13 +108,16 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
         _redLenta.value = valor
     }
 
-    fun cargarUnaPorUna() = cargar("Una por una") {
+    private val _tiempos = MutableStateFlow(TiemposCarga())
+    val tiempos: StateFlow<TiemposCarga> = _tiempos.asStateFlow()
+
+    fun cargarUnaPorUna() = cargar(ModoCarga.UNA_POR_UNA) {
         val perfil = repo.cargarPerfil()
         val pedidos = repo.cargarPedidos(_simularError.value, _redLenta.value)
         perfil to pedidos
     }
 
-    fun cargarALaVez() = cargar("A la vez") {
+    fun cargarALaVez() = cargar(ModoCarga.A_LA_VEZ) {
         coroutineScope {
             val perfilDiferido = async { repo.cargarPerfil() }
             val pedidosDiferidos = async { repo.cargarPedidos(_simularError.value, _redLenta.value) }
@@ -121,7 +127,7 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
 
     fun reintentar() = cargarALaVez()
 
-    private fun cargar(modo: String, obtener: suspend () -> Pair<String, List<String>>) {
+    private fun cargar(modo: ModoCarga, obtener: suspend () -> Pair<String, List<String>>) {
         if (_carga.value is CargaUi.Cargando || _carga.value is CargaUi.Reintentando) return
 
         viewModelScope.launch {
@@ -129,11 +135,20 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
             val inicio = System.currentTimeMillis()
             try {
                 val (perfil, pedidos) = ejecutarConReintento { obtener() }
+                val milisegundos = System.currentTimeMillis() - inicio
+
+                _tiempos.update { actual ->
+                    when (modo) {
+                        ModoCarga.UNA_POR_UNA -> actual.copy(unaPorUna = milisegundos)
+                        ModoCarga.A_LA_VEZ -> actual.copy(aLaVez = milisegundos)
+                    }
+                }
+
                 _carga.value = CargaUi.Exito(
                     modo = modo,
                     perfil = perfil,
                     pedidos = pedidos.size,
-                    milisegundos = System.currentTimeMillis() - inicio
+                    milisegundos = milisegundos
                 )
             } catch (e: TimeoutCancellationException) {
                 _carga.value = CargaUi.Error("Tardó demasiado (más de ${LIMITE_CARGA_MS / 1000} s)")
