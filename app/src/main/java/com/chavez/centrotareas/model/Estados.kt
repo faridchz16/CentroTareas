@@ -6,9 +6,11 @@ sealed interface PrimosUi {
     data class Listo(val cantidad: Int, val milisegundos: Long) : PrimosUi
     data object Cancelado : PrimosUi
 }
+
 sealed interface CargaUi {
     data object Inicial : CargaUi
     data object Cargando : CargaUi
+    data class Reintentando(val intento: Int, val total: Int) : CargaUi
     data class Exito(
         val modo: String,
         val perfil: String,

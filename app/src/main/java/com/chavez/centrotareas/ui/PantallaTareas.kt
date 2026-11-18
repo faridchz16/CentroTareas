@@ -69,7 +69,7 @@ fun PantallaTareas(vm: TareasViewModel) {
     val hasta = textoPrimos.toIntOrNull()
     val numeroValido = hasta != null && hasta >= 2
     val calculando = primos is PrimosUi.Calculando
-    val cargando = carga is CargaUi.Cargando
+    val cargando = carga is CargaUi.Cargando || carga is CargaUi.Reintentando
 
     Scaffold(
         topBar = {
@@ -231,6 +231,9 @@ fun PantallaTareas(vm: TareasViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     CargaUi.Cargando -> Cargando(texto = "Cargando...")
+                    is CargaUi.Reintentando -> Cargando(
+                        texto = "Reintentando… intento ${estadoCarga.intento} de ${estadoCarga.total}"
+                    )
                     is CargaUi.Exito -> RecuadroExito(
                         lineas = listOf(
                             "Modo: ${estadoCarga.modo}",

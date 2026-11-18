@@ -11,11 +11,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import java.io.IOException
 
 class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
 
@@ -118,13 +120,13 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
     fun reintentar() = cargarALaVez()
 
     private fun cargar(modo: String, obtener: suspend () -> Pair<String, List<String>>) {
-        if (_carga.value is CargaUi.Cargando) return
+        if (_carga.value is CargaUi.Cargando || _carga.value is CargaUi.Reintentando) return
 
         viewModelScope.launch {
             _carga.value = CargaUi.Cargando
             val inicio = System.currentTimeMillis()
             try {
-                val (perfil, pedidos) = withTimeout(LIMITE_CARGA_MS) { obtener() }
+                val (perfil, pedidos) = ejecutarConReintento { obtener() }
                 _carga.value = CargaUi.Exito(
                     modo = modo,
                     perfil = perfil,
@@ -135,13 +137,28 @@ class TareasViewModel(private val repo: TareasRepository) : ViewModel() {
                 _carga.value = CargaUi.Error("Tardó demasiado (más de ${LIMITE_CARGA_MS / 1000} s)")
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: IOException) {
+                _carga.value = CargaUi.Error("No se pudo cargar tras $INTENTOS_MAXIMOS intentos: ${e.message}")
             } catch (e: Exception) {
                 _carga.value = CargaUi.Error("No se pudo cargar: ${e.message}")
             }
         }
     }
 
+    private suspend fun <T> ejecutarConReintento(bloque: suspend () -> T): T {
+        repeat(INTENTOS_MAXIMOS - 1) { indice ->
+            try {
+                return withTimeout(LIMITE_CARGA_MS) { bloque() }
+            } catch (e: IOException) {
+                _carga.value = CargaUi.Reintentando(indice + 2, INTENTOS_MAXIMOS)
+                delay(1000L * (indice + 1))
+            }
+        }
+        return withTimeout(LIMITE_CARGA_MS) { bloque() }
+    }
+
     private companion object {
         const val LIMITE_CARGA_MS = 6000L
+        const val INTENTOS_MAXIMOS = 3
     }
 }
